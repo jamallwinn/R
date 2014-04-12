@@ -1,0 +1,248 @@
+# load twitter library
+ library(twitteR)
+# search for all the homedepot tweets
+ homedepot.tweets=searchTwitter('homedepot',n=1500)
+# length(homedepot.tweets)
+#[#1] 162
+# class(homedepot.tweets)
+[1] "list"
+ #tweet=homedepot.tweets[[1]]
+ class(tweet)
+[1] "status"
+attr(,"package")
+[1] "twitteR"
+ #tweet$getScreenName()
+[1] "i_RAHOFA"
+# tweet$getText()
+ library("plyr")
+ homedepot.text=laply(homedepot.tweets,function(t)t$getText())
+# length(homedepot.text)
+# head(homedepot.text,5)
+# load list of positive and negative words for SIMPLE sentiment analysis
+# you would have to download the files from a website I included below - make sure you put in the directory that you will be
+# referencing
+ #hu.liu.pos=scan('/Users/marcinkulakowski/Downloads/r/positive-words.txt',what='character',comment.char=';')
+ #hu.liu.neg=scan('/Users/marcinkulakowski/Downloads/r/negative-words.txt',what='character',comment.char=';')
+ #pos.words=c(hu.liu.pos,'upgrade')
+ #neg.words=c(hu.liu.neg,'wtf','wait','waiting','epicfail','mechanical')
+ 
+ pos.words = readLines("pos.txt")
+ 
+ neg.words = readLines("neg.txt")
+ 
+# sampling
+ #sample=c("You'reawesomeandIloveyou","Ihateandhateandhate.Soangry.Die!","Impressedandamazed:youarepeerlessinyourachievementofunparalleledmediocrity.")
+ score.sentiment = function(sentences, pos.words, neg.words, .progress='none')
+{
+  require(plyr)
+  require(stringr)
+  
+  # we got a vector of sentences. plyr will handle a list
+  # or a vector as an "l" for us
+  # we want a simple array ("a") of scores back, so we use
+  # "l" + "a" + "ply" = "laply":
+  scores = laply(sentences, function(sentence, pos.words, neg.words) {
+    
+    # clean up sentences with R's regex-driven global substitute, gsub():
+    sentence = gsub('[[:punct:]]', '', sentence)
+    sentence = gsub('[[:cntrl:]]', '', sentence)
+    sentence = gsub('\\d+', '', sentence)
+    # and convert to lower case:
+    sentence = tolower(sentence)
+    
+    # split into words. str_split is in the stringr package
+    word.list = str_split(sentence, '\\s+')
+    # sometimes a list() is one level of hierarchy too much
+    words = unlist(word.list)
+    
+    # compare our words to the dictionaries of positive & negative terms
+    pos.matches = match(words, pos.words)
+    neg.matches = match(words, neg.words)
+    
+    # match() returns the position of the matched term or NA
+    # we just want a TRUE/FALSE:
+    pos.matches = !is.na(pos.matches)
+    neg.matches = !is.na(neg.matches)
+    
+    # and conveniently enough, TRUE/FALSE will be treated as 1/0 by sum():
+    score = sum(pos.matches) - sum(neg.matches)
+    
+    return(score)
+  }, pos.words, neg.words, .progress=.progress )
+  
+  scores.df = data.frame(score=scores, text=sentences)
+  return(scores.df)
+}
+ #result=score.sentiment(sample,pos.words,neg.words)
+ class(result)
+[1] "data.frame"
+ result$score
+[1] 0 0 0
+ homedepot.scores=score.sentiment(homedepot.text,pos.words,neg.words,.progress='text')
+head( homedepot.scores)
+ homedepot.scores$Retailer='homedepot'
+ homedepot.scores$code='HD'
+ hist(homedepot.scores$score)
+# homedepot histogram
+ library("ggplot2")
+ qplot(homedepot.scores$score)
+# qplot homedepot
+# lets search for all other major hotels
+# amazon
+amazon.tweets=searchTwitter('amazon',n=1500)
+class(tweet)
+amazon.text=laply(amazon.tweets,function(t)t$getText())
+amazon.scores=score.sentiment(amazon.text,pos.words,neg.words,.progress='text')
+amazon.scores$Retailer='amazon'
+amazon.scores$code='AM'
+# lowes
+lowes.tweets=searchTwitter('lowes',n=1500)
+class(tweet)
+lowes.text=laply(lowes.tweets,function(t)t$getText())
+lowes.scores=score.sentiment(lowes.text,pos.words,neg.words,.progress='text')
+lowes.scores$Retailer='lowes'
+lowes.scores$code='lw'
+# truevalue
+truevalue.tweets=searchTwitter('truevalue',n=1500)
+class(tweet)
+truevalue.text=laply(truevalue.tweets,function(t)t$getText())
+truevalue.scores=score.sentiment(truevalue.text,pos.words,neg.words,.progress='text')
+truevalue.scores$Retailer='truevalue'
+truevalue.scores$code='TV'
+head(truevalue.scores,1)
+# acehardware
+acehardware.tweets=searchTwitter('acehardware',n=1500)
+class(tweet)
+acehardware.text=laply(acehardware.tweets,function(t)t$getText())
+acehardware.scores=score.sentiment(acehardware.text,pos.words,neg.words,.progress='text')
+acehardware.scores$Retailer='acehardware'
+acehardware.scores$code='AH'
+# sears
+sears.tweets=searchTwitter('sears',n=1500)
+class(tweet)
+sears.text=laply(sears.tweets,function(t)t$getText())
+sears.scores=score.sentiment(sears.text,pos.words,neg.words,.progress='text')
+sears.scores$Retailer='sears'
+sears.scores$code='SRS'
+# menards
+menards.tweets=searchTwitter('menards',n=1500)
+class(tweet)
+menards.text=laply(menards.tweets,function(t)t$getText())
+menards.scores=score.sentiment(menards.text,pos.words,neg.words,.progress='text')
+menards.scores$Retailer='menards'
+menards.scores$code='md'
+ all.scores=rbind(amazon.scores,lowes.scores,homedepot.scores,truevalue.scores,acehardware.scores,sears.scores,menards.scores)
+head(all.scores,2)
+library(ggplot2)
+ # Make separate plot for each hotel
+ ggplot(data=all.scores)+#ggplotworksondata.frames,always
+  geom_bar(mapping=aes(x=score,fill=Retailer),binwidth=1)+
+  facet_grid(Retailer~.)+#makeaseparateplotforeachhotel
+  theme_bw()+scale_fill_brewer()#plaindisplay,nicercolors
+# Plot
+ all.scores$very.pos=as.numeric(all.scores$score)
+ all.scores$very.neg=as.numeric(all.scores$score) 
+twitter.df=ddply(all.scores,c('Retailer','code'),summarise,pos.count=sum(very.pos),neg.count=sum(very.neg))
+                                  twitter.df$all.count=twitter.df$pos.count+twitter.df$neg.count
+                                  twitter.df$score=round(100*twitter.df$pos.count/twitter.df$all.count)
+                                  install.packages("doBy")
+                                  library("doBy")
+                                  orderBy(~-score,twitter.df)
+                                 hotel code pos.count neg.count all.count score
+                                 1 acehardware BW 6 0 6 100
+                                 5 sears SW 7 0 7 100
+                                 6 lowes WY 2 0 2 100
+                                 3 menards HY 7 1 8 88
+                                 2 homedepot HL 15 3 18 83
+                                 4 truevalue MI 13 4 17 76
+                                  install.packages("XML")
+                                  library(XML)
+                                  acsi.url='http://www.theacsi.org/index.php?option=com_content&view=article&id=147&catid=&Itemid=212&i=Hotels'
+                                 # scrape acsi website for scores
+                                  acsi.df=readHTMLTable(acsi.url,header=T,which=1,stringsAsFactors=F)
+                                  acsi.df=acsi.df[,c(1,18)]
+                                  head(acsi.df,1)
+                                  colnames(acsi.df)=c('hotel','score')
+                                  acsi.df$score=as.numeric(acsi.df$score)
+                                  View(acsi.df)
+write.csv(acsi.df, "acsi.df.csv", row.names=FALSE)
+
+
+a$code=c('AM','SRS','HD','lw')
+a$score=as.numeric(a$score)
+ compare.df=merge(twitter.df,a,by='code',suffixes=c('.twitter','.acsi'))
+ compare.df=subset(compare.df,all.count100)
+ compare.df=merge(twitter.df,a,by='code',suffixes=c('.twitter','.acsi'))
+ View(compare.df)
+
+write.csv(compare.df, "compare.df.csv", row.names=FALSE)
+ 
+ 
+ ggplot(compare.df)+geom_point(aes(x=score.twitter,y=score.acsi,color=Retailer.twitter),size=6)
+ + geom_smooth(aes(x=score.twitter,y=score.acsi,group=1),se=F,method="lm")
+ +theme_bw()+opts(legend.position=c(0.85,0.85))
+
+#Consumer satisfaction Index website
+acsi.url='http://www.theacsi.org/index.php?option=com_content&view=article&id=147&catid=&Itemid=212&i=Specialty+Retail+Stores'
+# scrape acsi website for scores
+acsi.df=readHTMLTable(acsi.url,header=T,which=1,stringsAsFactors=F)
+acsi.df=acsi.df[,c(1,18)]
+head(acsi.df,1)
+colnames(acsi.df)=c('hotel','score')
+acsi.df$score=as.numeric(acsi.df$score)
+View(acsi.df)
+
+
+#SEARS
+sears.url='http://www.theacsi.org/index.php?option=com_content&view=article&id=149&catid=&Itemid=214&c=Sears'
+sears.df=readHTMLTable(sears.url,header=T,which=1,stringsAsFactors=F)
+sears.df=sears.df[,c(1,18)]
+class(sears.df)
+sears.df=sears.df[9,]
+head(acsi.df,1)
+colnames(sears.df)=c('Retailer','score')
+sears.df$score=as.numeric(sears.df$score)
+View(sears.df)
+
+#AMAZON
+amazon.url='http://www.theacsi.org/index.php?option=com_content&view=article&id=149&catid=&Itemid=214&c=Amazon'
+amazon.df=readHTMLTable(amazon.url,header=T,which=1,stringsAsFactors=F)
+amazon.df=amazon.df[,c(1,18)]
+class(amazon.df)
+amazon.df=amazon.df[1,]
+head(amazon.df,1)
+colnames(amazon.df)=c('Retailer','score')
+amazon.df$score=as.numeric(amazon.df$score)
+View(amazon.df)
+
+
+#HOMEDEPOT
+Homedepot.url='http://www.theacsi.org/index.php?option=com_content&view=article&id=149&catid=&Itemid=214&c=Home+Depot'
+Homedepot.df=readHTMLTable(Homedepot.url,header=T,which=1,stringsAsFactors=F)
+Homedepot.df=Homedepot.df[,c(1,18)]
+class(Homedepot.df)
+Homedepot.df=Homedepot.df[9,]
+head(Homedepot.df,1)
+colnames(Homedepot.df)=c('Retailer','score')
+Homedepot.df$score=as.numeric(Homedepot.df$score)
+View(Homedepot.df)
+
+#LOWES
+#Lowes.url="http://www.theacsi.org/index.php?option=com_content&view=article&id=149&catid=&Itemid=214&c=Lowe\'s"
+#Lowes.df=readHTMLTable(Lowes.url,header=T,which=1,stringsAsFactors=F)
+#Lowes.df=Lowes.df[,c(1,18)]
+#class(Lowes.df)
+#Lowes.df=Lowes.df[9,]
+#head(Lowes.df,1)
+#colnames(Lowes.df)=c('Retailer','score')
+#Lowes.df$score=as.numeric(Lowes.df$score)
+#View(Lowes.df)
+
+Retailer <- c('Lowes')
+score <- as.integer(c(82))
+Lowes.df <- data.frame(Retailer,score)
+View(Lowes.df)
+
+a <- rbind(amazon.df,sears.df,Homedepot.df,Lowes.df)
+ a <-a[,-row.names]
+b<- c(a$Retailer,a$score)
